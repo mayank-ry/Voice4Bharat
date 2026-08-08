@@ -54,12 +54,6 @@ export const WelcomeView = ({
             AI Legal Literacy Assistant
           </p>
 
-          <p className="mt-3 max-w-lg text-sm leading-6 text-slate-500">
-            Know your rights. Understand Indian law.
-            <br />
-            Voice-first legal guidance for every citizen.
-          </p>
-
           <Button
             size="lg"
             onClick={onStartCall}

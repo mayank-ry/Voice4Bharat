@@ -23,12 +23,8 @@ export const CallEndedView = ({
 </div>
 
         <h1 className="text-2xl font-bold text-slate-900">
-          Conversation ended
+          Conversation Ended
         </h1>
-
-        <p className="mt-2 text-sm text-slate-500">
-          Thanks for talking to NyaAI. Start a new conversation anytime.
-        </p>
         <Button
   size="lg"
   onClick={onStartAgain}
@@ -42,7 +38,7 @@ export const CallEndedView = ({
   variant="ghost"
   size="lg"
   onClick={onDismiss}
-  className="mt-3 w-full rounded-full text-slate-500 hover:text-slate-700"
+  className="mt-3 w-full rounded-full text-slate-800 hover:text-slate-1000"
 >
   No thanks
 </Button>
