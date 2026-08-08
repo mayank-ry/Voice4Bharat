@@ -283,25 +283,22 @@ export function AgentTrackControl({
         pending={pending}
         disabled={disabled}
         onPressedChange={onPressedChange}
-        className="peer/track group/track focus:z-10 has-[.audiovisualizer]:w-auto has-[.audiovisualizer]:px-3 has-[~_button]:rounded-r-none has-[~_button]:border-r-0 has-[~_button]:pr-2 has-[~_button]:pl-3"
-      >
-        {audioTrack && (
-          <AgentAudioVisualizerBar
-            size="icon"
-            barCount={3}
-            state={pressed ? 'speaking' : 'disconnected'}
-            audioTrack={pressed ? audioTrack : undefined}
-            className="audiovisualizer flex h-6 w-auto items-center justify-center gap-0.5"
-          >
-            <span
-              className={cn([
-                'h-full min-h-0.5 w-0.5 origin-center',
-                'group-data-[state=on]/track:bg-foreground group-data-[state=off]/track:bg-destructive',
-                'data-lk-muted:bg-muted',
-              ])}
-            />
-          </AgentAudioVisualizerBar>
-        )}
+        className="peer/track group/track focus:z-10 has-[.audiovisualizer]:w-16 has-[.audiovisualizer]:px-3 has-[~_button]:rounded-r-none has-[~_button]:border-r-0 has-[~_button]:pr-2 has-[~_button]:pl-3"      >
+        <AgentAudioVisualizerBar
+  size="icon"
+  barCount={3}
+  state={pressed ? 'speaking' : 'disconnected'}
+  audioTrack={pressed ? audioTrack : undefined}
+  className="audiovisualizer flex h-6 w-6 items-center justify-center gap-0.5"
+>
+  <span
+    className={cn([
+      'h-full min-h-0.5 w-0.5 origin-center',
+      'group-data-[state=on]/track:bg-foreground group-data-[state=off]/track:bg-destructive',
+      'data-lk-muted:bg-muted',
+    ])}
+  />
+</AgentAudioVisualizerBar>
       </AgentTrackToggle>
       {kind && (
         <TrackDeviceSelect

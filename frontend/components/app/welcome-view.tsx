@@ -42,9 +42,9 @@ export const WelcomeView = ({
     >
       <div className="w-full max-w-2xl rounded-3xl border bg-white p-10 shadow-lg">
         <div className="flex flex-col items-center text-center">
-          <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100">
-            <Scale className="h-10 w-10 text-blue-700" />
-          </div>
+          <div className="mb-4 flex h-20 w-20 items-center justify-center">
+  <img src="/nyaai-logo.svg" alt="NyaAI" className="h-20 w-20" />
+</div>
 
           <h1 className="text-4xl font-bold text-slate-900">
             NyaAI

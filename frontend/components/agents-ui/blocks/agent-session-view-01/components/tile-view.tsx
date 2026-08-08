@@ -14,9 +14,9 @@ import { AudioVisualizer } from './audio-visualizer';
 
 const ANIMATION_TRANSITION: MotionProps['transition'] = {
   type: 'spring',
-  stiffness: 675,
-  damping: 75,
-  mass: 1,
+  stiffness: 900,
+  damping: 60,
+  mass: 0.8,
 };
 
 const tileViewClassNames = {
@@ -107,7 +107,12 @@ export function TileLayout({
   const videoHeight = agentVideoTrack?.publication.dimensions?.height ?? 0;
 
   return (
-    <div className="absolute inset-x-0 top-8 bottom-32 z-50 md:top-12 md:bottom-40">
+    <div
+  className={cn(
+    'absolute inset-x-0 bottom-32 z-50 md:bottom-40',
+    chatOpen ? 'top-8 md:top-12' : 'top-20 md:top-24'
+  )}
+>
       <div className="relative mx-auto h-full max-w-2xl px-4 md:px-0">
         <div className={cn(tileViewClassNames.grid)}>
           {/* Agent */}
@@ -120,7 +125,7 @@ export function TileLayout({
             ])}
           >
             <AnimatePresence mode="popLayout">
-              {!isAvatar && (
+              {!isAvatar && !chatOpen && (
                 // Audio Agent
                 <motion.div
   key="agent"
@@ -133,9 +138,9 @@ export function TileLayout({
   }}
   className="flex flex-col items-center justify-center"
 >
-  <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100">
-    <Scale className="h-10 w-10 text-blue-700" />
-  </div>
+  <div className="mb-6 flex h-20 w-20 items-center justify-center">
+  <img src="/nyaai-logo.svg" alt="NyaAI" className="h-20 w-20" />
+</div>
 
   <h2 className="text-2xl font-bold">
     NyaAI

@@ -10,6 +10,10 @@ import {
 } from '@/components/agents-ui/agent-control-bar';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import { cn } from '@/lib/shadcn/utils';
+import { Scale } from 'lucide-react';
+import { toast as sonnerToast } from 'sonner';
+import { WarningIcon } from '@phosphor-icons/react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TileLayout } from './tile-view';
 
 const MotionMessage = motion.create(Shimmer);
@@ -29,8 +33,8 @@ const BOTTOM_VIEW_MOTION_PROPS: MotionProps = {
   animate: 'visible',
   exit: 'hidden',
   transition: {
-    duration: 0.3,
-    delay: 0.5,
+    duration: 0.15,
+    delay: 0.1,
     ease: 'easeOut',
   },
 };
@@ -41,15 +45,15 @@ const CHAT_MOTION_PROPS: MotionProps = {
       opacity: 0,
       transition: {
         ease: 'easeOut',
-        duration: 0.3,
+        duration: 0.15,
       },
     },
     visible: {
       opacity: 1,
       transition: {
-        delay: 0.2,
+        delay: 0.05,
         ease: 'easeOut',
-        duration: 0.3,
+        duration: 0.15,
       },
     },
   },
@@ -64,15 +68,15 @@ const SHIMMER_MOTION_PROPS: MotionProps = {
       opacity: 1,
       transition: {
         ease: 'easeIn',
-        duration: 0.5,
-        delay: 0.8,
+        duration: 0.25,
+        delay: 0.2,
       },
     },
     hidden: {
       opacity: 0,
       transition: {
         ease: 'easeIn',
-        duration: 0.5,
+        duration: 0.25,
         delay: 0,
       },
     },
@@ -217,6 +221,24 @@ const getAgentStatus = () => {
 
 const status = getAgentStatus();
 
+const handleDeviceError = ({ source, error }: { source: string; error: Error }) => {
+  if (source !== 'microphone') return;
+
+  sonnerToast.custom(
+    (id) => (
+      <Alert onClick={() => sonnerToast.dismiss(id)} className="bg-accent w-full md:w-[364px]">
+        <WarningIcon weight="bold" />
+        <AlertTitle>Microphone access needed</AlertTitle>
+        <AlertDescription>
+          Your browser blocked microphone access. Click the lock/camera icon in your address bar,
+          allow microphone, then reload the page to talk to NyaAI.
+        </AlertDescription>
+      </Alert>
+    ),
+    { duration: 15_000 }
+  );
+};
+
   const controls: AgentControlBarControls = {
     leave: true,
     microphone: true,
@@ -241,42 +263,29 @@ const status = getAgentStatus();
       {...props}
     >
       <Fade top className="absolute inset-x-4 top-0 z-10 h-40" />
+      <div className="absolute top-8 right-10 z-50 pointer-events-none">
+      <div className="w-fit rounded-full border bg-background/90 px-4 py-1.5 backdrop-blur">
+      <div className="flex items-center gap-2">
+      <span className={`h-2.5 w-2.5 rounded-full ${status.color}`} />
+      <span className="text-sm font-medium">{status.text}</span>
+    </div>
+  </div>
+</div>
       {/* transcript */}
 
       <div className="absolute top-0 bottom-[135px] flex w-full flex-col md:bottom-[170px]">
         <AnimatePresence>
+
           {chatOpen && (
             <motion.div
               {...CHAT_MOTION_PROPS}
               className="flex h-full w-full flex-col gap-4 space-y-3 transition-opacity duration-300 ease-out"
             >
-              <div className="absolute top-6 left-1/2 z-50 w-full max-w-xl -translate-x-1/2 px-6">
-  <div className="rounded-xl border bg-background/90 px-5 py-3 backdrop-blur">
-    <div className="flex items-center justify-between">
-
-      <div>
-        <h2 className="font-bold text-lg">
-          NyaAI
-        </h2>
-
-        <p className="text-xs text-muted-foreground">
-          AI Legal Literacy Assistant
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span
-          className={`h-2.5 w-2.5 rounded-full ${status.color}`}
-        />
-        <span className="text-sm font-medium">
-          {status.text}
-        </span>
-      </div>
-
-    </div>
-  </div>
+              <div className="absolute top-6 left-1/2 z-40 -translate-x-1/2">
+  <div className="flex h-20 w-20 items-center justify-center">
+  <img src="/nyaai-logo.svg" alt="NyaAI" className="h-20 w-20" />
 </div>
-
+</div>
               <AgentChatTranscript
                 agentState={agentState}
                 messages={messages}
@@ -323,13 +332,14 @@ const status = getAgentStatus();
         <div className="bg-background relative mx-auto max-w-2xl pb-3 md:pb-12">
           <Fade bottom className="absolute inset-x-0 top-0 h-4 -translate-y-full" />
           <AgentControlBar
-            variant="livekit"
-            controls={controls}
-            isChatOpen={chatOpen}
-            isConnected={session.isConnected}
-            onDisconnect={session.end}
-            onIsChatOpenChange={setChatOpen}
-          />
+  variant="livekit"
+  controls={controls}
+  isChatOpen={chatOpen}
+  isConnected={session.isConnected}
+  onDisconnect={session.end}
+  onIsChatOpenChange={setChatOpen}
+  onDeviceError={handleDeviceError}
+/>
         </div>
       </motion.div>
     </section>
