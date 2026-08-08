@@ -31,3 +31,7 @@ KMS
 
 # GitHub CLI
 .github/personal-instructions.md
+
+*.db
+NyaAI_Memory.db
+output.py
