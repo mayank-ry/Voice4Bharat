@@ -181,6 +181,42 @@ export function AgentSessionView_01({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { state: agentState } = useAgent();
 
+const getAgentStatus = () => {
+  switch (agentState) {
+    case "connecting":
+      return {
+        color: "bg-yellow-500",
+        text: "Connecting...",
+      };
+
+    case "listening":
+      return {
+        color: "bg-green-500",
+        text: "Listening...",
+      };
+
+    case "thinking":
+        return {
+          color: "bg-orange-500",
+          text: "Thinking...",
+        };
+
+    case "speaking":
+      return {
+        color: "bg-blue-600",
+        text: "Speaking...",
+      };
+
+    default:
+      return {
+        color: "bg-gray-400",
+        text: "Ready",
+      };
+  }
+};
+
+const status = getAgentStatus();
+
   const controls: AgentControlBarControls = {
     leave: true,
     microphone: true,
@@ -214,6 +250,33 @@ export function AgentSessionView_01({
               {...CHAT_MOTION_PROPS}
               className="flex h-full w-full flex-col gap-4 space-y-3 transition-opacity duration-300 ease-out"
             >
+              <div className="absolute top-6 left-1/2 z-50 w-full max-w-xl -translate-x-1/2 px-6">
+  <div className="rounded-xl border bg-background/90 px-5 py-3 backdrop-blur">
+    <div className="flex items-center justify-between">
+
+      <div>
+        <h2 className="font-bold text-lg">
+          NyaAI
+        </h2>
+
+        <p className="text-xs text-muted-foreground">
+          AI Legal Literacy Assistant
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span
+          className={`h-2.5 w-2.5 rounded-full ${status.color}`}
+        />
+        <span className="text-sm font-medium">
+          {status.text}
+        </span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
               <AgentChatTranscript
                 agentState={agentState}
                 messages={messages}

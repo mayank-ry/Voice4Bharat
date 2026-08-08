@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Scale } from "lucide-react";
 import { Track } from 'livekit-client';
 import { AnimatePresence, type MotionProps, motion } from 'motion/react';
 import {
@@ -122,42 +123,50 @@ export function TileLayout({
               {!isAvatar && (
                 // Audio Agent
                 <motion.div
-                  key="agent"
-                  layoutId="agent"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{
-                    ...ANIMATION_TRANSITION,
-                    delay: animationDelay,
-                  }}
-                  className={cn('relative aspect-square h-[90px]')}
-                >
-                  <AudioVisualizer
-                    key="audio-visualizer"
-                    initial={{ scale: 1 }}
-                    animate={{ scale: chatOpen ? 0.2 : 1 }}
-                    transition={{
-                      ...ANIMATION_TRANSITION,
-                      delay: animationDelay,
-                    }}
-                    audioVisualizerType={audioVisualizerType}
-                    audioVisualizerColor={audioVisualizerColor}
-                    audioVisualizerColorShift={audioVisualizerColorShift}
-                    audioVisualizerBarCount={audioVisualizerBarCount}
-                    audioVisualizerRadialBarCount={audioVisualizerRadialBarCount}
-                    audioVisualizerRadialRadius={audioVisualizerRadialRadius}
-                    audioVisualizerGridRowCount={audioVisualizerGridRowCount}
-                    audioVisualizerGridColumnCount={audioVisualizerGridColumnCount}
-                    audioVisualizerWaveLineWidth={audioVisualizerWaveLineWidth}
-                    isChatOpen={chatOpen}
-                    className={cn(
-                      'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
-                      'bg-background rounded-[50px] border border-transparent transition-[border,drop-shadow]',
-                      chatOpen && 'border-input shadow-2xl/10 delay-200'
-                    )}
-                    style={{ color: audioVisualizerColor }}
-                  />
-                </motion.div>
+  key="agent"
+  layoutId="agent"
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{
+    ...ANIMATION_TRANSITION,
+    delay: animationDelay,
+  }}
+  className="flex flex-col items-center justify-center"
+>
+  <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100">
+    <Scale className="h-10 w-10 text-blue-700" />
+  </div>
+
+  <h2 className="text-2xl font-bold">
+    NyaAI
+  </h2>
+
+  <p className="mb-6 text-sm text-muted-foreground">
+    AI Legal Literacy Assistant
+  </p>
+
+  <AudioVisualizer
+    key="audio-visualizer"
+    initial={{ scale: 1 }}
+    animate={{ scale: chatOpen ? 0.25 : 1 }}
+    transition={{
+      ...ANIMATION_TRANSITION,
+      delay: animationDelay,
+    }}
+    audioVisualizerType={audioVisualizerType}
+    audioVisualizerColor={audioVisualizerColor}
+    audioVisualizerColorShift={audioVisualizerColorShift}
+    audioVisualizerBarCount={audioVisualizerBarCount}
+    audioVisualizerRadialBarCount={audioVisualizerRadialBarCount}
+    audioVisualizerRadialRadius={audioVisualizerRadialRadius}
+    audioVisualizerGridRowCount={audioVisualizerGridRowCount}
+    audioVisualizerGridColumnCount={audioVisualizerGridColumnCount}
+    audioVisualizerWaveLineWidth={audioVisualizerWaveLineWidth}
+    isChatOpen={chatOpen}
+    className="rounded-full"
+    style={{ color: audioVisualizerColor }}
+  />
+</motion.div>
               )}
 
               {isAvatar && (
