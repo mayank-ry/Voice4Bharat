@@ -271,6 +271,9 @@ For deeper documentation on each part, see:
 - [Murf Discord](https://discord.gg/FbKAy96Sz7)
 - [Murf Startup Incubator](https://murf.ai/api) — 50M free characters for startups
 
+
+"Legal section data (IPC↔BNS mapping) is a hand-curated static local dataset covering common sections, not a live government API, since no public API exists for this cross-reference. Data reflects BNS 2023 (effective 1 July 2024)."
+
 ---
 
 ## License

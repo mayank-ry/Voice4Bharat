@@ -1,5 +1,6 @@
 import logging
 from database import init_db
+import re
 from dotenv import load_dotenv
 from livekit import rtc
 from livekit.agents import (
@@ -227,12 +228,68 @@ Example:
 Your primary mission is not to win arguments.
 Your primary mission is to educate citizens accurately, responsibly, and safely while encouraging them to seek qualified legal assistance whenever necessary.
 """
-
+# legal_sections.py
+LEGAL_SECTIONS = {
+    "420": {"topic": "cheating", "bns": "BNS Section 318", "desc": "Cheating and dishonestly inducing delivery of property."},
+    "302": {"topic": "murder", "bns": "BNS Section 103", "desc": "Punishment for murder."},
+    "376": {"topic": "rape", "bns": "BNS Section 64", "desc": "Punishment for rape."},
+    "354": {"topic": "assault on woman", "bns": "BNS Section 74", "desc": "Assault or criminal force to woman with intent to outrage modesty."},
+    "498a": {"topic": "cruelty by husband", "bns": "BNS Section 85", "desc": "Cruelty by husband or relatives of husband."},
+    "379": {"topic": "theft", "bns": "BNS Section 303", "desc": "Punishment for theft."},
+    "499": {"topic": "defamation", "bns": "BNS Section 356", "desc": "Defamation."},
+    # add more as needed
+}
 
 class Assistant(Agent):
     def __init__(self, user_id: str,extra_instructions:str = "") -> None:
         self.user_id = user_id
         super().__init__(instructions=SYSTEM_PROMPT+extra_instructions)
+    @function_tool
+    async def legal_lookup(
+        self,
+        context: RunContext,
+        query: str,
+    ) -> str:
+        """
+    Look up an Indian criminal law section by its old IPC number (e.g. '420', '302')
+    or by topic keyword (e.g. 'cheating', 'theft', 'murder'). Use this whenever the user
+    asks what a specific IPC/legal section means, or which section applies to an offence
+    like cheating, theft, assault, murder, dowry harassment, or defamation. Always call this
+    instead of answering from memory, because Indian criminal law changed on 1 July 2024
+    when the IPC was replaced by the Bharatiya Nyaya Sanhita (BNS) 2023.
+    """
+        try:
+            q = query.strip().lower()
+            digits = re.findall(r"\d+[a-z]?", q)
+            match = None
+
+            if digits:
+                match = LEGAL_SECTIONS.get(digits[0])
+
+            if not match:
+                for code, data in LEGAL_SECTIONS.items():
+                    if data["topic"] in q or code in q:
+                        match = data
+                        break
+
+            if not match:
+                return (
+                "Mujhe is section ya topic ka exact match nahi mila mere data me. "
+                "Main sirf kuch common sections cover karta hoon abhi — "
+                "aap National Legal Services Authority (NALSA) helpline 15100 par confirm kar sakte hain."
+            )
+
+            return (
+            f"Purana IPC Section {digits[0] if digits else match['topic']} ab "
+            f"{match['bns']} ke naam se jaana jaata hai, kyunki 1 July 2024 se naya "
+            f"Bharatiya Nyaya Sanhita 2023 lagu hai. Ye section {match['desc']} "
+            f"Ye jaankari July 2024 ke BNS update ke hisaab se hai."
+        )
+        except Exception:
+            return (
+            "Mujhe abhi legal database access karne me dikkat aa rahi hai. "
+            "Aap thodi der baad dobara pooch sakte hain, ya NALSA helpline 15100 try karein."
+        )   
 
     @function_tool
     async def lookup_user(self, context: RunContext) -> str:
