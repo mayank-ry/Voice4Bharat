@@ -1,6 +1,8 @@
 import logging
 from database import init_db
 import re
+import os, json
+from livekit import api
 from dotenv import load_dotenv
 from livekit import rtc
 from livekit.agents import (
@@ -353,11 +355,55 @@ server.setup_fnc = prewarm
 @server.rtc_session(agent_name="my-agent")
 async def my_agent(ctx: JobContext):
     # Logging setup
+    
     # Add any other context you want in all log entries here
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
     await ctx.connect()
+    dial_info = None
+    if ctx.job.metadata:
+        dial_info = json.loads(ctx.job.metadata)
+    outbound_context = ""
+    if dial_info and dial_info.get("sip_address"):
+        trunk_id = os.getenv("SIP_OUTBOUND_TRUNK_ID")
+        try:
+            sip_address = dial_info["sip_address"]
+            sip_user = sip_address.split("@")[0]
+            is_outbound = bool(dial_info and dial_info.get("sip_address"))
+
+            outbound_context = """
+
+# OUTBOUND CALL — MANDATORY OPENING
+This call was INITIATED BY YOU (NyaAI), not requested by the person answering.
+They did not ask for this call and may not know who is calling.
+
+Your VERY FIRST response, in the first two sentences, MUST:
+1. State who is calling (NyaAI, a legal literacy assistant) and why
+   (e.g. "Namaste, main NyaAI bol raha hoon — aapko pehle jo [topic] ke
+   baare me baat hui thi uska ek chhota follow-up dena tha.")
+2. State clearly how to stop the call/opt out
+   (e.g. "Agar aap abhi baat nahi karna chahte, bas boliye 'band karo'
+   aur main call yahi khatam kar dunga.")
+
+Do NOT launch into legal content before these two things are said.
+If the person says anything indicating they want to end the call
+("band karo", "nahi chahiye", "busy hoon", "mat karo", etc.),
+politely acknowledge and end the call immediately. Do not persist.
+""" if is_outbound else ""
+            await ctx.api.sip.create_sip_participant(
+                api.CreateSIPParticipantRequest(
+                    room_name=ctx.room.name,
+                    sip_trunk_id=trunk_id,
+                    sip_call_to=sip_user,  # e.g. "tumhara_username@tumhara-sip-domain.com"
+                    participant_identity="sip_linphone_test",
+                    wait_until_answered=True,
+                )
+            )
+        except Exception as e:
+            logger.error(f"Outbound call failed: {e}")
+            return
+
     participant = await ctx.wait_for_participant()
     user_id = participant.identity
     user_id = "mayank_local_test"
@@ -448,7 +494,7 @@ not just at the end.
 
     # Start the session, which initializes the voice pipeline and warms up the models
     await session.start(
-        agent=Assistant(user_id,extra_instructions=memory_context),
+        agent=Assistant(user_id,extra_instructions=memory_context+outbound_context),
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
@@ -458,12 +504,20 @@ not just at the end.
                     == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
                     else noise_cancellation.BVC()
                 ),
+                
             ),
         ),
     )
 
     # Join the room and connect to the user
-
+    if dial_info and dial_info.get("sip_address"):
+        await session.generate_reply(
+            instructions="Greet the caller now following the OUTBOUND CALL MANDATORY OPENING instructions — state who is calling, why, and how to opt out, in the first two sentences."
+        )
+    else:
+        await session.generate_reply(
+            instructions="Greet the caller naturally as per your GREETING instructions."
+        )
 
 if __name__ == "__main__":
     cli.run_app(server)

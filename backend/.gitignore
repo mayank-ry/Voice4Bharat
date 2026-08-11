@@ -35,3 +35,4 @@ KMS
 *.db
 NyaAI_Memory.db
 output.py
+outbound-trunk.json
