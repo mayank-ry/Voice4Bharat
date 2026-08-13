@@ -45,7 +45,7 @@ export const WelcomeView = ({
   return (
     <div
       {...props}
-      className="flex min-h-screen items-center justify-center bg-slate-50 px-6"
+      className="flex min-h-full items-center justify-center bg-slate-50 px-6 py-8"
     >
       <div className="w-full max-w-2xl rounded-3xl border bg-white p-10 shadow-lg">
         <div className="flex flex-col items-center text-center">
@@ -75,9 +75,6 @@ export const WelcomeView = ({
         </div>
 
         {/* Outbound Call */}
-        <div className="mt-8 flex justify-center">
-          <OutboundCallPanel />
-        </div>
 
         <div className="mt-10">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">

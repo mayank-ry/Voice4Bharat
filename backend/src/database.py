@@ -18,9 +18,111 @@ def init_db():
         last_interaction TEXT)
 
         """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS scheduled_calls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        sip_address TEXT NOT NULL,
+        topic TEXT,
+        scheduled_time TEXT NOT NULL,
+        status TEXT DEFAULT 'scheduled',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS calls (
+    call_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    channel TEXT,
+    started_at TEXT,
+    ended_at TEXT,
+    outcome TEXT DEFAULT 'in_progress',
+    reason TEXT)
+    """)
+
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS escalations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    reason TEXT,
+    summary TEXT,
+    urgency TEXT,
+    language TEXT,
+    follow_up TEXT,
+    status TEXT DEFAULT 'open',
+    created_at TEXT)
+    """)
+def schedule_call(user_id: str, sip_address: str, topic: str, scheduled_time: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "INSERT INTO scheduled_calls (user_id, sip_address, topic, scheduled_time) VALUES (?, ?, ?, ?)",
+        (user_id, sip_address, topic, scheduled_time)
+    )
+    conn.commit()
+    conn.close()
+
+def get_due_calls():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT * FROM scheduled_calls WHERE status='pending' AND scheduled_time <= ?",
+        (datetime.now(timezone.utc).isoformat(),)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def mark_call_done(call_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("UPDATE scheduled_calls SET status='done' WHERE id=?", (call_id,))
+    conn.commit()
+    conn.close()
 
     conn.commit()
     conn.close()
+
+def create_escalation_record(user_id, reason, summary, urgency, language, follow_up):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.execute(
+        "INSERT INTO escalations (user_id, reason, summary, urgency, language, follow_up, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (user_id, reason, summary, urgency, language, follow_up, datetime.now(timezone.utc).isoformat())
+    )
+    conn.commit()
+    escalation_id = cur.lastrowid
+    conn.close()
+    return escalation_id
+
+def start_call(user_id: str, channel: str) -> int:
+    now = datetime.now(timezone.utc).isoformat()
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.execute(
+        "INSERT INTO calls (user_id, channel, started_at, outcome) VALUES (?, ?, ?, 'in_progress')",
+        (user_id, channel, now)
+    )
+    conn.commit()
+    call_id = cur.lastrowid
+    conn.close()
+    return call_id
+
+def end_call(call_id: int, outcome: str, reason: str):
+    now = datetime.now(timezone.utc).isoformat()
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "UPDATE calls SET ended_at = ?, outcome = ?, reason = ? WHERE call_id = ?",
+        (now, outcome, reason, call_id)
+    )
+    conn.commit()
+    conn.close()
+
+def get_call_stats():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    total = conn.execute("SELECT COUNT(*) c FROM calls WHERE outcome != 'in_progress'").fetchone()["c"]
+    success = conn.execute("SELECT COUNT(*) c FROM calls WHERE outcome = 'success'").fetchone()["c"]
+    failed = conn.execute("SELECT COUNT(*) c FROM calls WHERE outcome = 'failed'").fetchone()["c"]
+    recent = conn.execute("SELECT call_id, channel, started_at, ended_at, outcome, reason FROM calls WHERE outcome != 'in_progress' ORDER BY started_at DESC LIMIT 10").fetchall()
+    conn.close()
+    return {"total": total, "success": success, "failed": failed, "recent": [dict(r) for r in recent]}
 
 def get_user(user_id:str):
     conn = sqlite3.connect(DB_PATH)
@@ -127,6 +229,5 @@ def save_user(
                 now
             )
         )
-
     conn.commit()
     conn.close()

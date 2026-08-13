@@ -2,6 +2,7 @@ import logging
 from database import init_db
 import re
 import os, json
+import httpx
 from livekit import api
 from dotenv import load_dotenv
 from livekit import rtc
@@ -122,6 +123,26 @@ Immediately recommend contacting the appropriate authority or a qualified advoca
 • Property disputes
 • Divorce proceedings
 • Emergency legal situations
+
+# ESCALATION
+For these situations, you must offer human escalation:
+1. EMERGENCY/SAFETY: arrest, bail, domestic violence,Need Help, sexual assault,Bahut Pareshan Hu, child abuse,
+   serious criminal allegations, or other urgent safety situations.
+2. UNCERTAINTY: you are not confident enough to give accurate legal information.
+3. If User Speak n Tell send my query to human help centre then send their summary
+When either situation happens:
+1. Tell the caller clearly you cannot fully resolve this and a human should help.
+2. Explain exactly what short summary you want to send (state it out loud) and
+   ASK PERMISSION before sending anything. Example: "Main ek chhota summary bhej
+   sakta hoon ki aapko [topic] ke baare me help chahiye — kya main ye bhej doon?"
+3. If they say no, do NOT call create_escalation. Continue helping as best you can.
+4. If they say yes, ask how they'd like to be followed up (call back, SIP address,
+   etc.), then call create_escalation with a short factual summary — never include
+   OTPs, passwords, PINs, Aadhaar, PAN, or account numbers in the summary.
+5. After creating it, tell them their reference ID and that a human will review it,
+   without promising a specific response time unless you know one.
+Do NOT escalate for normal legal questions you can answer confidently.
+
 # STYLE
 
 Keep responses suitable for spoken conversations.
@@ -144,6 +165,13 @@ LANGUAGE & SCRIPT
 Always write every language in its own native script.
 - Hindi → Devanagari (नमस्ते), never romanized (never "namaste").
 - Same rule for all non-English languages.
+
+# FOLLOW-UP SCHEDULING
+1. If the user's issue is time-sensitive (RTI deadline, FIR follow-up, court date reminder)
+and they agree to a reminder call, ask for their SIP address (or Linphone username)
+and confirm the topic, then call schedule_followup_call. Do not schedule without
+explicit user consent.
+2. When User says ki call, phone lagao help chahiye me or mujhe phone lagao like things then call them on their respective sip address
 
 # AUTOMATIC MEMORY
 
@@ -245,6 +273,8 @@ LEGAL_SECTIONS = {
 class Assistant(Agent):
     def __init__(self, user_id: str,extra_instructions:str = "") -> None:
         self.user_id = user_id
+        self.helped = False
+        self.escalated = False
         super().__init__(instructions=SYSTEM_PROMPT+extra_instructions)
     @function_tool
     async def legal_lookup(
@@ -280,7 +310,7 @@ class Assistant(Agent):
                 "Main sirf kuch common sections cover karta hoon abhi — "
                 "aap National Legal Services Authority (NALSA) helpline 15100 par confirm kar sakte hain."
             )
-
+            self.helped = True
             return (
             f"Purana IPC Section {digits[0] if digits else match['topic']} ab "
             f"{match['bns']} ke naam se jaana jaata hai, kyunki 1 July 2024 se naya "
@@ -291,7 +321,100 @@ class Assistant(Agent):
             return (
             "Mujhe abhi legal database access karne me dikkat aa rahi hai. "
             "Aap thodi der baad dobara pooch sakte hain, ya NALSA helpline 15100 try karein."
-        )   
+        ) 
+    @function_tool
+    async def create_escalation(
+        self,
+        context: RunContext,
+        reason: str,          # "emergency_safety" or "agent_uncertain"
+        summary: str,         # short 2-3 sentence summary, no private info
+        urgency: str,        # "low" | "medium" | "high" | "emergency"
+        language: str,
+        follow_up: str,      # how they want to be contacted, e.g. "call back on this SIP address"
+    ) -> str:
+        """Create a request for human help. ONLY call this AFTER the caller has explicitly
+        agreed to share a summary with a human. Use reason='emergency_safety' for arrest,
+        domestic violence, sexual assault, child abuse, or other urgent safety situations.
+        Use reason='agent_uncertain' when you are not confident enough to give accurate
+        legal information and the caller wants human follow-up. The summary must NOT include
+        OTPs, passwords, PINs, Aadhaar, PAN, or account numbers."""
+        from database import create_escalation_record
+
+        escalation_id = create_escalation_record(
+            self.user_id, reason, summary, urgency, language, follow_up
+        )
+        self.escalated = True
+        # Notify via Discord webhook
+        webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+        if webhook_url:
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        webhook_url,
+                        json={
+                            "content": (
+                                f"🚨 **New Escalation #{escalation_id}** (urgency: {urgency})\n"
+                                f"**Reason:** {reason}\n"
+                                f"**Summary:** {summary}\n"
+                                f"**Language:** {language}\n"
+                                f"**Follow-up:** {follow_up}"
+                            )
+                        },
+                    )
+            except Exception as e:
+                logger.error(f"Discord webhook failed: {e}")
+
+        return (
+            f"Aapka reference ID hai {escalation_id}. Ek human team member "
+            f"jaldi hi is par dekhega, lekin main abhi confirm nahi kar sakta ki kitni "
+            f"jaldi reply aayega. Aap {follow_up} ke through contact ho sakte hain."
+        )
+
+    @function_tool
+    async def schedule_followup_call(
+        self,
+        context: RunContext,
+        sip_address: str,
+        topic: str,
+        minutes_from_now: int,
+    ) -> str:
+        """Schedule an automatic outbound follow-up call to the caller's SIP address about
+        a specific topic. If the user wants to be called RIGHT NOW (e.g. "abhi call karo",
+        "phone laga do"), pass minutes_from_now=0. For a future reminder (e.g. RTI deadline),
+        pass the actual delay in minutes. Always confirm the caller's SIP address and the
+        topic with them before calling this tool."""
+
+        import json
+        from livekit import api as lk_api
+
+        if minutes_from_now <= 0:
+            # Immediate call — dispatch a new job right now, same as the frontend "Trigger Call" button
+            try:
+                lkapi = lk_api.LiveKitAPI()
+                await lkapi.agent_dispatch.create_dispatch(
+                    lk_api.CreateAgentDispatchRequest(
+                        agent_name="my-agent",
+                        room=f"immediate-followup-{self.user_id}",
+                        metadata=json.dumps({"sip_address": sip_address}),
+                    )
+                )
+                await lkapi.aclose()
+                return f"Theek hai, main aapko abhi {sip_address} par call kar raha hoon."
+            except Exception as e:
+                logger.error(f"Immediate outbound dispatch failed: {e}")
+                return "Mujhe abhi call trigger karne me dikkat aa rahi hai. Thodi der baad try karein."
+
+        from database import schedule_call
+        from datetime import datetime, timedelta, timezone
+
+        scheduled_time = (
+            datetime.now(timezone.utc) + timedelta(minutes=minutes_from_now)
+        ).isoformat()
+        schedule_call(self.user_id, sip_address, topic, scheduled_time)
+        return (
+            f"Theek hai, {minutes_from_now} minute baad aapko {topic} ke baare me follow-up "
+            f"call aayegi. (Note: iske liye scheduler background service chalna zaroori hai.)"
+        )
 
     @function_tool
     async def lookup_user(self, context: RunContext) -> str:
@@ -369,6 +492,7 @@ async def my_agent(ctx: JobContext):
         trunk_id = os.getenv("SIP_OUTBOUND_TRUNK_ID")
         try:
             sip_address = dial_info["sip_address"]
+            logger.info(f"Immediate call requested with sip_address={sip_address!r}")
             sip_user = sip_address.split("@")[0]
             is_outbound = bool(dial_info and dial_info.get("sip_address"))
 
@@ -407,6 +531,9 @@ politely acknowledge and end the call immediately. Do not persist.
     participant = await ctx.wait_for_participant()
     user_id = participant.identity
     user_id = "mayank_local_test"
+    from database import start_call, end_call
+    channel = "sip" if (dial_info and dial_info.get("sip_address")) else "browser"
+    call_id = start_call(user_id, channel)
     logger.info(f"USER_ID FOR THIS SESSION: {user_id}")
     from database import get_user
     user_data = get_user(user_id)
@@ -471,7 +598,7 @@ not just at the end.
         vad=ctx.proc.userdata["vad"],
         # allow the LLM to generate a response while waiting for the end of turn
         # See more at https://docs.livekit.io/agents/build/audio/#preemptive-generation
-        preemptive_generation=True,
+        preemptive_generation=False,
     )
 
     # To use a realtime model instead of a voice pipeline, use the following session setup instead.
@@ -493,8 +620,21 @@ not just at the end.
     # await avatar.start(session, room=ctx.room)
 
     # Start the session, which initializes the voice pipeline and warms up the models
+    assistant = Assistant(user_id, extra_instructions=memory_context + outbound_context)
+
+    async def _log_call_outcome():
+        outcome = "success" if (assistant.helped or assistant.escalated) else "failed"
+        reason = (
+            "legal_lookup_matched" if assistant.helped
+            else "escalated" if assistant.escalated
+            else "no_concrete_outcome"
+        )
+        end_call(call_id, outcome, reason)
+
+    ctx.add_shutdown_callback(_log_call_outcome)
+
     await session.start(
-        agent=Assistant(user_id,extra_instructions=memory_context+outbound_context),
+        agent=assistant,
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(

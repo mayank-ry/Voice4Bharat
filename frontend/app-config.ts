@@ -49,9 +49,9 @@ export const APP_CONFIG_DEFAULTS: AppConfig = {
   startButtonText: 'Start talking',
 
   // optional: audio visualization configuration
-  // audioVisualizerType: 'bar',
-  // audioVisualizerColor: '#002cf2',
-  // audioVisualizerColorDark: '#1fd5f9',
+  audioVisualizerType: 'aura',
+  audioVisualizerColor: '#1d4ed8',
+  audioVisualizerColorDark: '#1d4ed8',
   // audioVisualizerColorShift: 0.3,
   // audioVisualizerBarCount: 5,
   // audioVisualizerType: 'radial',

@@ -431,7 +431,7 @@ export function AgentAudioVisualizerAura({
     <AuraShader
       ref={ref}
       data-lk-state={state}
-      blur={0.2}
+      blur={0.03}
       color={color}
       colorShift={colorShift}
       speed={speed}

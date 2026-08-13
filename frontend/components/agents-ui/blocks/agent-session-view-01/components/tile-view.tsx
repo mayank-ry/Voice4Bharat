@@ -110,7 +110,7 @@ export function TileLayout({
     <div
   className={cn(
     'absolute inset-x-0 bottom-32 z-50 md:bottom-40',
-    chatOpen ? 'top-8 md:top-12' : 'top-20 md:top-24'
+    chatOpen ? 'top-8 md:top-12' : 'top-12 md:top-39'
   )}
 >
       <div className="relative mx-auto h-full max-w-2xl px-4 md:px-0">
@@ -142,7 +142,7 @@ export function TileLayout({
   <img src="/nyaai-logo.svg" alt="NyaAI" className="h-20 w-20" />
 </div>
 
-  <h2 className="text-2xl font-bold">
+  <h2 className="mb-2 text-2xl font-bold text-slate-900">
     NyaAI
   </h2>
 

@@ -263,14 +263,14 @@ const handleDeviceError = ({ source, error }: { source: string; error: Error }) 
       {...props}
     >
       <Fade top className="absolute inset-x-4 top-0 z-10 h-40" />
-      <div className="absolute top-8 right-10 z-50 pointer-events-none">
-      <div className="w-fit rounded-full border bg-background/90 px-4 py-1.5 backdrop-blur">
-      <div className="flex items-center gap-2">
-      <span className={`h-2.5 w-2.5 rounded-full ${status.color}`} />
-      <span className="text-sm font-medium">{status.text}</span>
-    </div>
-  </div>
-</div>
+      <div className="absolute top-6 right-6 z-[60] pointer-events-none">
+        <div className="w-fit rounded-full border border-slate-200 bg-white px-4 py-1.5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className={`h-2.5 w-2.5 rounded-full ${status.color}`} />
+            <span className="text-sm font-medium text-slate-700">{status.text}</span>
+          </div>
+        </div>
+      </div>
       {/* transcript */}
 
       <div className="absolute top-0 bottom-[135px] flex w-full flex-col md:bottom-[170px]">
