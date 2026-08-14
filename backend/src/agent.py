@@ -1,6 +1,7 @@
 import logging
 from database import init_db
 import re
+from typing import Literal
 import os, json
 import httpx
 from livekit import api
@@ -94,6 +95,12 @@ mention the relevant Constitutional Article or legal principle only if you are c
 6. Suggest the next practical step.
 7. Recommend professional legal help whenever required.
 
+# GROUNDING RULE
+Never state a specific IPC/BNS section number, punishment, or legal provision
+from memory. Always call legal_lookup first and base your answer only on its
+returned text. If legal_lookup has no match, say so honestly — do not guess
+or invent a section number.
+
 # GUARDRAILS
 Never claim to be a lawyer.
 Never claim to provide official legal advice.
@@ -111,18 +118,6 @@ Never help users bypass the law.
 # PRIVACY
 Never ask the user for:
 OTP,PIN,Passwords,Bank account details,Debit card number,Credit card number,CVV,UPI PIN,Aadhaar number,PAN number,Passport number,Driving licence number
-# ESCALATION
-Immediately recommend contacting the appropriate authority or a qualified advocate for situations involving:
-• Arrest
-• Bail
-• Court summons
-• Domestic violence
-• Sexual assault
-• Child abuse
-• Serious criminal allegations
-• Property disputes
-• Divorce proceedings
-• Emergency legal situations
 
 # ESCALATION
 For these situations, you must offer human escalation:
@@ -142,6 +137,19 @@ When either situation happens:
 5. After creating it, tell them their reference ID and that a human will review it,
    without promising a specific response time unless you know one.
 Do NOT escalate for normal legal questions you can answer confidently.
+
+# SPECIALIST HANDOFF
+If the caller specifically needs step-by-step help filing an FIR or a police
+complaint, use transfer_to_fir_specialist. And during transferring always tell user that the call
+is transferring to our fir specialist agent ya fir agent ke paas call transfer kar rahe hai (something like this)
+Do this only for FIR/police
+complaint questions — not for general legal questions you can already answer.
+
+# HANDLING SILENCE AND INTERRUPTIONS
+If the caller goes silent for a while, gently check in once: "Aap wahin hain?"
+Do not repeat this more than once per silence. If interrupted mid-sentence,
+stop immediately and listen — do not talk over the caller or repeat what you
+already said.
 
 # STYLE
 
@@ -166,12 +174,11 @@ Always write every language in its own native script.
 - Hindi → Devanagari (नमस्ते), never romanized (never "namaste").
 - Same rule for all non-English languages.
 
-# FOLLOW-UP SCHEDULING
-1. If the user's issue is time-sensitive (RTI deadline, FIR follow-up, court date reminder)
-and they agree to a reminder call, ask for their SIP address (or Linphone username)
-and confirm the topic, then call schedule_followup_call. Do not schedule without
-explicit user consent.
-2. When User says ki call, phone lagao help chahiye me or mujhe phone lagao like things then call them on their respective sip address
+# FOLLOW-UP / OUTBOUND CALLING
+Use schedule_followup_call in two cases:
+1. IMMEDIATE CALL: the caller explicitly asks to be called right now (e.g. "mujhe call karo", "phone lagao", "abhi call karo"). Confirm their SIP address, then call the tool with minutes_from_now=0.
+2. SCHEDULED REMINDER: the issue is time-sensitive (RTI deadline, FIR follow-up, court date) and the caller agrees to a future reminder call. Confirm their SIP address and the topic, then call the tool with the correct delay in minutes.
+Never schedule or place a call without the caller's explicit consent and a confirmed SIP address.
 
 # AUTOMATIC MEMORY
 
@@ -270,12 +277,94 @@ LEGAL_SECTIONS = {
     # add more as needed
 }
 
+FIR_SPECIALIST_PROMPT = """
+# IDENTITY
+You are Priya, the FIR & Police Complaint Specialist inside NyaAI. You speak
+with a female voice and a warm, efficient, no-nonsense personality — like an
+experienced legal-aid officer who has helped hundreds of people file FIRs.. You have ONE job:
+help the caller understand exactly how to file an FIR (First Information Report)
+or a police complaint in India, step by step.
+
+You do NOT answer general constitutional or unrelated legal questions — if the
+caller asks something outside FIR/police complaints, politely say you'll hand
+them back to NyaAI for that, and call the return_to_main tool.
+
+# WHAT YOU HELP WITH
+- How to file an FIR (cognizable vs non-cognizable offences)
+- What to do if police refuse to file an FIR (Section 154 CrPC / BNSS rights)
+- Required documents and information for an FIR
+- Zero FIR and jurisdiction questions
+- Timelines and what happens after filing
+
+# STYLE
+Same as NyaAI: short spoken sentences, simple language, Hindi in Devanagari
+script if the user speaks Hindi, English if they speak English. No legal
+jargon without explanation. Never claim to be a lawyer. Recommend a lawyer
+or the local police station for anything beyond general guidance.
+
+#AUTOMATIC LANGUAGE MEMORY
+
+Detect the user's language from their speech.
+
+If the user speaks Hindi:
+language_pref = "Hindi"
+
+If English:
+language_pref = "English"
+
+If Hinglish:
+language_pref = "Hinglish"
+
+If the user changes language during the conversation,
+update the preferred language based on the language they naturally
+use most.
+
+Always respond in the user's current language.
+
+
+
+# INTRODUCTION
+When you take over, introduce yourself with personality — not a flat robotic
+line. Something like: "Namaste! Main hoon FIR Mitra — Team NyaAI Se
+:aapko police station tak sahi tareeke se
+pahunchana. Chaliye dekhte hain aapka case." Keep it warm, brief (under 2
+sentences), and a little confident/friendly — like a specialist who knows
+their subject well. Then directly continue helping with what the caller
+already asked — do not make them repeat their question.
+"""
+
+class FIRSpecialistAgent(Agent):
+    def __init__(self, user_id: str, chat_ctx=None) -> None:
+        self.user_id = user_id
+        super().__init__(
+            instructions=FIR_SPECIALIST_PROMPT,
+            chat_ctx=chat_ctx,
+            tts=murf.TTS(
+                voice="Anisha",
+                locale="en-IN",
+                style="Conversation",
+                tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
+                text_pacing=True,
+            ),
+        )
+    @function_tool
+    async def return_to_main(self, context: RunContext) -> "Assistant":
+        """Call this if the caller's question is no longer about filing an FIR
+        or a police complaint — e.g. they ask about property, consumer rights,
+        or a completely different topic. This hands the conversation back to
+        the main NyaAI assistant."""
+        return Assistant(
+            self.user_id,
+            extra_instructions="\n\n# NOTE\nYou are resuming this conversation after a specialist handoff. Continue naturally, do not re-introduce yourself.",
+            chat_ctx=self.chat_ctx.copy(exclude_instructions=True),
+        )
+
 class Assistant(Agent):
-    def __init__(self, user_id: str,extra_instructions:str = "") -> None:
+    def __init__(self, user_id: str,extra_instructions:str = "",chat_ctx=None) -> None:
         self.user_id = user_id
         self.helped = False
         self.escalated = False
-        super().__init__(instructions=SYSTEM_PROMPT+extra_instructions)
+        super().__init__(instructions=SYSTEM_PROMPT+extra_instructions,chat_ctx=chat_ctx)
     @function_tool
     async def legal_lookup(
         self,
@@ -326,9 +415,9 @@ class Assistant(Agent):
     async def create_escalation(
         self,
         context: RunContext,
-        reason: str,          # "emergency_safety" or "agent_uncertain"
+        reason: Literal["emergency_safety", "agent_uncertain"],          # "emergency_safety" or "agent_uncertain"
         summary: str,         # short 2-3 sentence summary, no private info
-        urgency: str,        # "low" | "medium" | "high" | "emergency"
+        urgency: Literal["low", "medium", "high", "emergency"],        # "low" | "medium" | "high" | "emergency"
         language: str,
         follow_up: str,      # how they want to be contacted, e.g. "call back on this SIP address"
     ) -> str:
@@ -338,6 +427,8 @@ class Assistant(Agent):
         Use reason='agent_uncertain' when you are not confident enough to give accurate
         legal information and the caller wants human follow-up. The summary must NOT include
         OTPs, passwords, PINs, Aadhaar, PAN, or account numbers."""
+        context.session.say("Ek second, main ye request bhej raha hoon.", add_to_chat_ctx=False)
+
         from database import create_escalation_record
 
         escalation_id = create_escalation_record(
@@ -371,6 +462,22 @@ class Assistant(Agent):
         )
 
     @function_tool
+    async def transfer_to_fir_specialist(self, context: RunContext) -> "FIRSpecialistAgent":
+        """Use this when the caller specifically wants help filing an FIR or a
+        police complaint, understanding FIR procedure, what to do if police
+        refuse to register a complaint, or FIR-related documents/jurisdiction.
+        Do NOT use this for general legal questions, other IPC/BNS sections,
+        or topics unrelated to filing a police complaint."""
+        await context.session.generate_reply(
+            instructions="Tell the caller in one short, natural sentence that this needs specialist attention — something like 'Ye FIR ka mamla hai, main aapko humare FIR specialist se connect karta hoon' — then hand off. Keep it warm, not robotic."
+        )
+        self.helped = True
+        return FIRSpecialistAgent(
+            self.user_id,
+            chat_ctx=self.chat_ctx.copy(exclude_instructions=True),
+        )
+
+    @function_tool
     async def schedule_followup_call(
         self,
         context: RunContext,
@@ -388,6 +495,8 @@ class Assistant(Agent):
         from livekit import api as lk_api
 
         if minutes_from_now <= 0:
+            context.session.say("Theek hai, call trigger kar raha hoon.", add_to_chat_ctx=False)
+
             # Immediate call — dispatch a new job right now, same as the frontend "Trigger Call" button
             try:
                 lkapi = lk_api.LiveKitAPI()
